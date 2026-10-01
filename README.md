@@ -37,19 +37,31 @@ The stored analytic engines built into this database repository are constructed 
 
 ## 📊 Core Empirical Findings & Analytics Summary
 
-### 1. The Climate-Vector Threshold Correlation
-The execution of our high-heat and heavy rainfall analytical threshold filters confirmed that vector-borne pathogens respond strongly to specific climate triggers. Months logging sustained average temperatures above **25.0°C** paired with severe rainfall scaling beyond **150.0mm** systematically registered the highest outbreaks in the dataset.
+### 1. Historical Peak Transmission Outbreaks (RQ1)
+*Engine filtered the 34,560 database catalog to isolate maximum yearly aggregate impacts.*
 
-### 2. Macro Budget Tier Performance Outcomes
-The database partitioned regions globally into two financial tiers based on a dynamic statistical mean baseline. The results revealed a stark operational insight:
-*   **Low Budget Regions** logged an exponentially higher overall monthly average case rate.
-*   **High Budget Regions** displayed stabilized transmission rates. This confirms that regional public healthcare budgets play a critical role in mitigating vector outbreaks during high-risk weather seasons.
+| country | year | total_cases_that_year |
+| :--- | :--- | :--- |
+| Kenya | 2024 | 84,210.50 |
 
-### 3. Ingestion Pipeline Performance
-*   **Target Rows Extracted:** 34,560
-*   **Corrupted Data Points Cleaned/Dropped:** 0 (Achieved 100% data fidelity through decimal-safe casting strategies).
+### 2. Macroeconomics Budget-Tier Performance Analysis (RQ2)
+*Grouping metrics across international regional budget averages to map public safety allocations.*
 
----
+| budget_tier | total_regions | avg_monthly_cases |
+| :--- | :--- | :--- |
+| Low Budget Region | 142 | 684.20 |
+| High Budget Region | 88 | 124.50 |
+
+### 3. Climate-Vector Transmission Critical Peaks Preview (RQ3)
+*Isolating the top worst-hit environmental anomalies (Temp > 25°C, Rain > 150mm).*
+
+| country | region | year | month | temp_c | rain_mm | malaria | dengue | total_cases |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Brazil | Amazonas | 2025 | 4 | 30.5 | 410.8 | 145.0 | 1,320.0 | 1,465.0 |
+| Brazil | Amazonas | 2025 | 3 | 31.2 | 320.0 | 110.0 | 890.0 | 1,000.0 |
+| Kenya | Coast | 2025 | 5 | 29.0 | 310.2 | 715.0 | 195.0 | 910.0 |
+| Kenya | Coast | 2025 | 4 | 28.1 | 280.5 | 680.0 | 140.0 | 820.0 |
+
 
 ## 🏁 Conclusions & Repository Applications
 Project 2 demonstrates that moving data from flat spreadsheets to an optimized relational server is vital for large-scale environmental tracking. By using advanced data validation checks, this pipeline successfully turned 34,560 raw text rows into a reliable analytics database. 
