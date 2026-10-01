@@ -1,4 +1,24 @@
-CREATE DATABASE ClimateHealthDB;
+-- =========================================================================
+-- PROJECT 2: CLIMATE PATTERNS & VECTOR-BORNE EPIDEMIOLOGY DATA PIPELINE
+-- Engine: Microsoft SQL Server (T-SQL)
+-- Records Managed: 34,560 Monthly Regional Environmental Logs
+-- =========================================================================
+
+-- 1. DATABASE INIT & ARCHITECTURE DEFINITION
+USE master;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'ClimateHealthDB')
+BEGIN
+    CREATE DATABASE ClimateHealthDB;
+END;
+GO
+
+USE ClimateHealthDB;
+GO
+
+-- Re-create the staging architecture to absorb text, decimals, or missing metrics risk-free
+DROP TABLE IF EXISTS climate_health_records;
 CREATE TABLE climate_health_records (
     [year] INT NOT NULL,
     [month] INT NOT NULL,
@@ -14,9 +34,10 @@ CREATE TABLE climate_health_records (
     healthcare_budget VARCHAR(100) NULL,
     
     PRIMARY KEY (country, region, [year], [month])
-
---Uploading CSV file fropm PC
 );
+GO
+
+-- 2. AUTOMATED BULK DATA MIGRATION INGESTION
 BULK INSERT climate_health_records
 FROM 'C:\Projects\Excel Project 1\Data_Master_Clean.csv'
 WITH (
@@ -24,125 +45,76 @@ WITH (
     ROWTERMINATOR = '\n',      
     FIRSTROW = 2               
 );
---first 50 raws of the data
+GO
+
+-- 3. POST-MIGRATION DATA INTEGRITY AUDITS
 SELECT COUNT(*) AS total_imported_rows FROM climate_health_records;
 SELECT TOP 50 * FROM climate_health_records;
 
---top 10 worst months for malaria
-SELECT TOP 10 
-    country, 
-    region, 
-    [year], 
-    [month], 
-    TRY_CAST(malaria_cases AS INT) AS clean_malaria_cases
-FROM 
-    climate_health_records
-ORDER BY 
-    clean_malaria_cases DESC;
-
---The Climate Vector Risk Query
-SELECT TOP 20
-    country,
-    region,
-    [year],
-    [month],
-    -- Cleanly read metrics as decimal numbers
-    TRY_CAST(avg_temp_c AS NUMERIC(4,1)) AS temp_c,
-    TRY_CAST(precipitation_mm AS NUMERIC(6,1)) AS rain_mm,
-    
-    -- Cleanly read disease metrics as whole integers
-    TRY_CAST(malaria_cases AS INT) AS malaria,
-    TRY_CAST(dengue_cases AS INT) AS dengue,
-    
-    -- Dynamically calculate total outbreaks
-    (ISNULL(TRY_CAST(malaria_cases AS INT), 0) + ISNULL(TRY_CAST(dengue_cases AS INT), 0)) AS total_cases
-FROM 
-    climate_health_records
-WHERE 
-    TRY_CAST(avg_temp_c AS NUMERIC(4,1)) > 25.0  -- High Heat Threshold
-    AND TRY_CAST(precipitation_mm AS NUMERIC(6,1)) > 150.0  -- Heavy Rainfall Threshold
-ORDER BY 
-    total_cases DESC;
-
---Data Validation Audit
+-- Pipeline integrity assessment (Checking for unconvertible anomalies)
 SELECT 
-    COUNT(*) AS total_rows,
-    SUM(CASE WHEN TRY_CAST(malaria_cases AS INT) IS NULL THEN 1 ELSE 0 END) AS messy_malaria_rows,
-    SUM(CASE WHEN TRY_CAST(dengue_cases AS INT) IS NULL THEN 1 ELSE 0 END) AS messy_dengue_rows,
-    SUM(CASE WHEN TRY_CAST(precipitation_mm AS NUMERIC(6,1)) IS NULL THEN 1 ELSE 0 END) AS messy_rain_rows
+    COUNT(*) AS total_audited_rows,
+    SUM(CASE WHEN TRY_CAST(malaria_cases AS NUMERIC(10,2)) IS NULL THEN 1 ELSE 0 END) AS invalid_malaria_rows,
+    SUM(CASE WHEN TRY_CAST(dengue_cases AS NUMERIC(10,2)) IS NULL THEN 1 ELSE 0 END) AS invalid_dengue_rows,
+    SUM(CASE WHEN TRY_CAST(precipitation_mm AS NUMERIC(10,2)) IS NULL THEN 1 ELSE 0 END) AS invalid_rain_rows
 FROM 
     climate_health_records;
+GO
 
---Analytics View
-CREATE VIEW v_climate_epidemiology_dashboard AS
+-- 4. ANALYTICS PIPELINE & PRODUCTION VIEW LAYER GENERATION
+-- Safely handle sub-unit fractions (e.g. 6.54 cases) by standardising via decimal matrices
+CREATE OR ALTER VIEW v_climate_epidemiology_dashboard AS
 SELECT 
     country,
     region,
     [year],
     [month],
-    -- Cast text columns directly to clear numeric fields since data is verified clean
-    CAST(avg_temp_c AS NUMERIC(4,1)) AS average_temperature_c,
-    CAST(precipitation_mm AS NUMERIC(6,1)) AS total_rainfall_mm,
-    CAST(air_quality_index AS INT) AS aqi,
-    CAST(uv_index AS INT) AS uv,
-    
-    -- Public Health Calculations
-    CAST(malaria_cases AS INT) AS malaria_cases,
-    CAST(dengue_cases AS INT) AS dengue_cases,
-    (CAST(malaria_cases AS INT) + CAST(dengue_cases AS INT)) AS combined_disease_burden,
-    
-    -- Demographics
+    CAST(avg_temp_c AS NUMERIC(10,2)) AS average_temperature_c,
+    CAST(precipitation_mm AS NUMERIC(10,2)) AS total_rainfall_mm,
+    CAST(air_quality_index AS NUMERIC(10,2)) AS aqi,
+    CAST(uv_index AS NUMERIC(10,2)) AS uv,
+    CAST(malaria_cases AS NUMERIC(10,2)) AS malaria_cases,
+    CAST(dengue_cases AS NUMERIC(10,2)) AS dengue_cases,
+    (CAST(malaria_cases AS NUMERIC(10,2)) + CAST(dengue_cases AS NUMERIC(10,2))) AS combined_disease_burden,
     CAST(population_density AS NUMERIC(10,2)) AS pop_density,
     CAST(healthcare_budget AS NUMERIC(15,2)) AS allocated_budget
 FROM 
     climate_health_records;
+GO
 
-    --testing the new view
+-- 5. PRODUCTION ANALYTICS QUERIES (RESEARCH GOAL RESOLUTION)
+
+-- [Test Query]: View validation isolating mid-tier burdens ordered by extreme rain
 SELECT TOP 10 * 
 FROM v_climate_epidemiology_dashboard 
 WHERE combined_disease_burden > 50
 ORDER BY total_rainfall_mm DESC;
 
-ALTER VIEW v_climate_epidemiology_dashboard AS
-SELECT 
-    country,
-    region,
-    [year],
-    [month],
-    -- Cast metrics to decimals
-    CAST(avg_temp_c AS NUMERIC(10,2)) AS average_temperature_c,
-    CAST(precipitation_mm AS NUMERIC(10,2)) AS total_rainfall_mm,
-    CAST(air_quality_index AS NUMERIC(10,2)) AS aqi,
-    CAST(uv_index AS NUMERIC(10,2)) AS uv,
-    
-    -- Fix: Read case columns as decimals/floats first so it doesn't crash on numbers like 6.54
-    CAST(malaria_cases AS NUMERIC(10,2)) AS malaria_cases,
-    CAST(dengue_cases AS NUMERIC(10,2)) AS dengue_cases,
-    
-    -- Calculate combined burden using decimal-safe math
-    (CAST(malaria_cases AS NUMERIC(10,2)) + CAST(dengue_cases AS NUMERIC(10,2))) AS combined_disease_burden,
-    
-    -- Demographics
-    CAST(population_density AS NUMERIC(10,2)) AS pop_density,
-    CAST(healthcare_budget AS NUMERIC(15,2)) AS allocated_budget
-FROM 
-    climate_health_records;
-
-
--- A baseline validation query that pulls the actual top 10 highest outbreak months in your dataset
+-- [Query 1]: High-Risk Transmission Outbreaks (Malaria focus)
 SELECT TOP 10 
-    country, 
-    region, 
-    [year], 
-    [month], 
-    total_rainfall_mm, 
-    combined_disease_burden
+    country, region, [year], [month], malaria_cases
 FROM 
     v_climate_epidemiology_dashboard
 ORDER BY 
+    malaria_cases DESC;
+
+-- [Query 2]: Climate-Vector Multi-Variable Extremes 
+SELECT TOP 20
+    country, region, [year], [month],
+    average_temperature_c AS temp_c,
+    total_rainfall_mm AS rain_mm,
+    malaria_cases AS malaria,
+    dengue_cases AS dengue,
+    combined_disease_burden AS total_cases
+FROM 
+    v_climate_epidemiology_dashboard
+WHERE 
+    average_temperature_c > 25.0  
+    AND total_rainfall_mm > 150.0  
+ORDER BY 
     combined_disease_burden DESC;
 
---The Deadliest Year on Record (Example: Kenya)
+-- [Query 3]: Historical Outbreak Peak (Deadliest year per target country - Example: Kenya)
 SELECT TOP 1
     country,
     [year],
@@ -150,19 +122,17 @@ SELECT TOP 1
 FROM 
     v_climate_epidemiology_dashboard
 WHERE 
-    country = 'Kenya'  -- You can swap 'Kenya' out for any country in your dataset
+    country = 'Kenya'  
 GROUP BY 
     country, [year]
 ORDER BY 
     total_cases_that_year DESC;
 
---High-Budget vs. Low-Budget Regional Case Breakdown
+-- [Query 4]: Macroeconomics Health Analysis (High vs Low Budget Breakdown)
 WITH BudgetThreshold AS (
-    -- 1. Calculate the baseline average budget across the dataset
     SELECT AVG(allocated_budget) AS avg_global_budget FROM v_climate_epidemiology_dashboard
 ),
 CategorizedRegions AS (
-    -- 2. Label each row cleanly using the threshold value
     SELECT 
         region,
         combined_disease_burden,
@@ -173,7 +143,6 @@ CategorizedRegions AS (
     FROM 
         v_climate_epidemiology_dashboard
 )
--- 3. Group and aggregate by the pre-calculated label
 SELECT 
     budget_tier,
     COUNT(DISTINCT region) AS total_regions,
@@ -183,15 +152,9 @@ FROM
 GROUP BY 
     budget_tier;
 
-
---Rainfall to Dengue Case Extraction
+-- [Query 5]: Bivariate Extraction Patterning (Rainfall to Dengue Distribution)
 SELECT 
-    country,
-    region,
-    [year],
-    [month],
-    total_rainfall_mm,
-    dengue_cases
+    country, region, [year], [month], total_rainfall_mm, dengue_cases
 FROM 
     v_climate_epidemiology_dashboard
 WHERE 
@@ -199,5 +162,4 @@ WHERE
     AND dengue_cases IS NOT NULL
 ORDER BY 
     total_rainfall_mm DESC;
-
-
+GO
