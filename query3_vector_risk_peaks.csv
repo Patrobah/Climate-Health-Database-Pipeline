@@ -1,0 +1,6 @@
+country,region,year,month,temp_c,rain_mm,malaria,dengue,total_cases
+Kenya,Coast,2025,4,28.1,280.5,680.0,140.0,820.0
+Kenya,Coast,2025,5,29.0,310.2,715.0,195.0,910.0
+Brazil,Amazonas,2025,4,30.5,410.8,145.0,1320.0,1465.0
+Brazil,Amazonas,2025,3,31.2,320.0,110.0,890.0,1000.0
+Kenya,Nyanza,2024,5,27.4,245.0,590.0,65.0,655.0
